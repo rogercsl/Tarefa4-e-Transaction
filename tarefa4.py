@@ -8,6 +8,7 @@ import os
 import warnings
 from OpenSSL import crypto
 from urllib.request import urlopen
+from datetime import datetime
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def carregarChavesConfiaveis(pastaCAConfiaveis):
@@ -42,6 +43,12 @@ def buscarCertificadoIntermediario(certificado):
                     except Exception as e:
                         print(f"Erro ao obter o intermediário via AIA: {e}")
     return None
+
+def verificarValidade(certificado):
+    dataExpiracao = datetime.strptime(certificado.get_notAfter().decode('ascii'), '%Y%m%d%H%M%SZ')
+    if datetime.now() > dataExpiracao:
+        return False, dataExpiracao
+    return True, dataExpiracao
 
 def construirCadeiaDeCertificacao(certificadoUsuario):
     cadeia = [certificadoUsuario]
@@ -105,20 +112,27 @@ def main():
 
     cadeia = construirCadeiaDeCertificacao(certificadoUsuario)
     print("\nCadeia de Certificação:")
+    certificadosExpirados = False
     for indice, certificado in enumerate(reversed(cadeia)):
         sujeito = certificado.get_subject()
-        print(f"{indice + 1}: CN: {sujeito.CN}, O: {sujeito.O if sujeito.O else ''}")
+        valido, expiracao = verificarValidade(certificado)
+        print(f"{indice + 1}: CN: {sujeito.CN}, O: {sujeito.O if sujeito.O else ''}, Expiração: {expiracao}")
+        if not valido:
+            certificadosExpirados = True
 
     print("\nVerificando se o certificado é confiável...")
     chavesConfiaveis = carregarChavesConfiaveis(pastaCAConfiaveis)
     if verificarConfiabilidadeDoCertificado(cadeia, chavesConfiaveis):
-        print("\nCertificado foi validado com sucesso!")
+        print("\nCertificado foi validado a partir da Cadeia de Certificação.")
         if verificarCRL(certificadoUsuario):
             print("O certificado está ativo e não foi revogado.")
         else:
-            print("Este certificado foi revogado ou não é válido.")
+            print("O certificado informado pelo usuário foi revogado.")
     else:
-        print("\nEste certificado NÃO é confiável!")
+        print("Este certificado NÃO é confiável!")
+    
+    if certificadosExpirados:
+        print("\nAtenção: Um ou mais certificados na cadeia estão fora do prazo de validade. Verifique na cadeia de certificação.")
 
 if __name__ == "__main__":
     main()
