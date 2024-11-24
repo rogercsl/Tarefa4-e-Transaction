@@ -112,27 +112,32 @@ def main():
 
     cadeia = construirCadeiaDeCertificacao(certificadoUsuario)
     print("\nCadeia de Certificação:")
+
     certificadosExpirados = False
     for indice, certificado in enumerate(reversed(cadeia)):
         sujeito = certificado.get_subject()
         valido, expiracao = verificarValidade(certificado)
-        print(f"{indice + 1}: CN: {sujeito.CN}, O: {sujeito.O if sujeito.O else ''}, Expiração: {expiracao}")
+        print(f"{indice + 1}: CN: {sujeito.CN}, O: {sujeito.O if sujeito.O else 'N/A'}, Expiração: {expiracao.strftime('%d/%m/%Y %H:%M:%S')}")
         if not valido:
             certificadosExpirados = True
 
     print("\nVerificando se o certificado é confiável...")
     chavesConfiaveis = carregarChavesConfiaveis(pastaCAConfiaveis)
     if verificarConfiabilidadeDoCertificado(cadeia, chavesConfiaveis):
-        print("\nCertificado foi validado a partir da Cadeia de Certificação.")
+        print("\nAutoridade de Certificação Raiz é CONFIÁVEL.")
         if verificarCRL(certificadoUsuario):
-            print("O certificado está ativo e não foi revogado.")
+            print("O certificado informado pelo usuário não foi revogado.")
         else:
             print("O certificado informado pelo usuário foi revogado.")
     else:
         print("Este certificado NÃO é confiável!")
-    
+
+    valido_usuario, expiracao_usuario = verificarValidade(certificadoUsuario)
+    if not valido_usuario:
+        print("O certificado informado pelo usuário está fora do prazo de validade. Expirou em:", expiracao_usuario.strftime('%d/%m/%Y %H:%M:%S'))
+
     if certificadosExpirados:
-        print("\nAtenção: Um ou mais certificados na cadeia estão fora do prazo de validade. Verifique na cadeia de certificação.")
+        print("\nATENÇÃO: Há certificado(s) expirado(s) na cadeia de certificação. Verifique na cadeia de certificação.")
 
 if __name__ == "__main__":
     main()
